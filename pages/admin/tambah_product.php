@@ -3,49 +3,30 @@ session_start();
 
 require '../../config/koneksi.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Ambil data dari form
-    $productName = $_POST['product_name'];
-    $categoryId = $_POST['category_id']; // Jika ada kategori
-    $price = $_POST['price'];
-    $stock = $_POST['stock'];
-    $sku = $_POST['sku'];
-    $description = $_POST['description'];
-    $metaTitle = $_POST['meta_title'];
-    $metaDescription = $_POST['meta_description'];
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $product_name = $_POST['product_name'] ?? '';
+    $price = $_POST['price'] ?? '';
+    $description = $_POST['full_description'] ?? '';
+    $category = $_POST['category'] ?? '';
 
-    // Simpan data produk ke database
-    $stmt = $conn->prepare("INSERT INTO products (name, category_id, price, stock, sku, description, meta_title, meta_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("siddisss", $productName, $categoryId, $price, $stock, $sku, $description, $metaTitle, $metaDescription);
-    $stmt->execute();
-    $productId = $stmt->insert_id;
+    // Validasi sederhana
+    if ($product_name && $price && $category) {
+        // Proses upload gambar
+        if (isset($_FILES['product_image']) && $_FILES['product_image']['error'] == 0) {
+            $image_name = $_FILES['product_image']['name'];
+            $tmp = $_FILES['product_image']['tmp_name'];
+            $target = 'uploads/' . basename($image_name);
 
-    // Proses upload gambar jika ada
-    if (!empty($_FILES['productImages']['name'][0])) {
-        $uploadDir = '../../assets/uploads/';
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-
-        foreach ($_FILES['productImages']['name'] as $key => $name) {
-            $tmpName = $_FILES['productImages']['tmp_name'][$key];
-            $type = $_FILES['productImages']['type'][$key];
-            $size = $_FILES['productImages']['size'][$key];
-
-            if (in_array($type, $allowedTypes) && $size <= 5 * 1024 * 1024) {
-                $ext = pathinfo($name, PATHINFO_EXTENSION);
-                $newName = uniqid('img_') . '.' . $ext;
-                $destination = $uploadDir . $newName;
-
-                if (move_uploaded_file($tmpName, $destination)) {
-                    // Simpan path gambar ke tabel product_images
-                    $stmt = $conn->prepare("INSERT INTO product_images (product_id, image_path) VALUES (?, ?)");
-                    $stmt->bind_param("is", $productId, $newName);
-                    $stmt->execute();
-                }
-            }
+            move_uploaded_file($tmp, $target);
+            $upload_status = "Gambar berhasil diunggah: $image_name";
+        } else {
+            $upload_status = "Gambar tidak diunggah.";
         }
-    }
 
-    echo "<script>alert('Produk berhasil ditambahkan!'); window.location.href = 'index_admin.php';</script>";
+        echo "<div class='alert alert-success'>Produk '$product_name' berhasil ditambahkan.<br>$upload_status</div>";
+    } else {
+        echo "<div class='alert alert-danger'>Harap lengkapi semua data yang wajib diisi.</div>";
+    }
 }
 ?>
 
@@ -60,6 +41,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        #imagePreview {
+            width: 200px;
+            height: 200px;
+            object-fit: cover;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 
 <body>
@@ -181,13 +172,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <!-- Product Form -->
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-body p-4">
-                        <form class="needs-validation" novalidate>
+                        <form class="needs-validation" novalidate action="" method="POST" enctype="multipart/form-data">
                             <!-- Form Tabs -->
                             <ul class="nav nav-tabs mb-4" id="productTab" role="tablist">
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic-info" type="button" role="tab" aria-controls="basic-info" aria-selected="true">Basic Info</button>
                                 </li>
-
                             </ul>
 
                             <!-- Tab Content -->
@@ -197,74 +187,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <div class="row g-3">
                                         <div class="col-12">
                                             <label for="productName" class="form-label">Product Name <span class="text-danger">*</span></label>
-                                            <input type="text" class="form-control" id="productName" placeholder="Enter product name" required>
-                                            <div class="invalid-feedback">
-                                                Please provide a product name.
-                                            </div>
+                                            <input type="text" name="product_name" class="form-control" id="productName" placeholder="Enter product name" required>
+                                            <div class="invalid-feedback">Please provide a product name.</div>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label for="price" class="form-label">Price <span class="text-danger">*</span></label>
+                                            <input type="text" name="price" class="form-control" id="price" placeholder="Enter price" required>
+                                            <div class="invalid-feedback">Please provide a price.</div>
                                         </div>
 
                                         <div class="col-12">
                                             <label for="fullDescription" class="form-label">Full Description</label>
-                                            <div class="card">
-                                                <div class="card-header bg-light p-2">
-                                                    <div class="btn-toolbar">
-                                                        <div class="btn-group me-2">
-                                                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                                                <i class="bi bi-type-bold"></i>
-                                                            </button>
-                                                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                                                <i class="bi bi-type-italic"></i>
-                                                            </button>
-                                                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                                                <i class="bi bi-type-underline"></i>
-                                                            </button>
-                                                        </div>
-                                                        <div class="btn-group me-2">
-                                                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                                                <i class="bi bi-list-ul"></i>
-                                                            </button>
-                                                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                                                <i class="bi bi-list-ol"></i>
-                                                            </button>
-                                                        </div>
-                                                        <div class="btn-group">
-                                                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                                                <i class="bi bi-link"></i>
-                                                            </button>
-                                                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                                                <i class="bi bi-image"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="card-body p-0">
-                                                    <textarea class="form-control border-0" id="fullDescription" rows="6" placeholder="Enter full product description"></textarea>
-                                                </div>
-                                            </div>
+                                            <textarea name="full_description" class="form-control" id="fullDescription" rows="5" placeholder="Enter full product description"></textarea>
                                         </div>
 
                                         <div class="col-12 col-md-6">
                                             <label for="category" class="form-label">Category <span class="text-danger">*</span></label>
-                                            <select class="form-select" id="category" required>
+                                            <select class="form-select" name="category" id="category" required>
                                                 <option value="" selected disabled>Select category</option>
-                                                <option value="1">Electronics</option>
-                                                <option value="2">Clothing</option>
-                                                <option value="3">Home & Garden</option>
-                                                <option value="4">Sports & Outdoors</option>
-                                                <option value="5">Toys & Games</option>
+                                                <option value="Electronics">Electronics</option>
+                                                <option value="Clothing">Clothing</option>
+                                                <option value="Home & Garden">Home & Garden</option>
+                                                <option value="Sports & Outdoors">Sports & Outdoors</option>
+                                                <option value="Toys & Games">Toys & Games</option>
                                             </select>
-                                            <div class="invalid-feedback">
-                                                Please select a category.
-                                            </div>
+                                            <div class="invalid-feedback">Please select a category.</div>
                                         </div>
 
+                                        <div class="col-12">
+                                            <label for="productImage" class="form-label">Upload Gambar</label>
+                                            <input class="form-control" type="file" name="product_image" id="productImage" accept="image/*" onchange="previewImage(event)">
+                                            <img id="imagePreview" src="#" alt="Preview Gambar" class="d-none" />
+                                        </div>
+
+                                        <div class="col-12 mt-4">
+                                            <button type="submit" class="btn btn-success">Simpan Produk</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </form>
                     </div>
-
-
 
                     <!-- Form Actions -->
                     <div class="d-flex justify-content-between border-top mt-4 pt-4">
@@ -323,25 +287,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         })()
     </script>
     <script>
-        document.getElementById('productImages').addEventListener('change', function(e) {
-            const fileNamesContainer = document.getElementById('fileNames');
-            const files = e.target.files;
+        function previewImage(event) {
+            const input = event.target;
+            const preview = document.getElementById('imagePreview');
 
-            if (files.length === 0) {
-                fileNamesContainer.innerHTML = "Tidak ada file yang dipilih.";
-                return;
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.classList.remove('d-none');
+                }
+                reader.readAsDataURL(input.files[0]);
             }
-
-            let output = "<strong>File terpilih:</strong><ul>";
-            for (let i = 0; i < files.length; i++) {
-                output += `<li>${files[i].name}</li>`;
-            }
-            output += "</ul>";
-
-            fileNamesContainer.innerHTML = output;
-        });
+        }
     </script>
-
 </body>
 
 </html>
