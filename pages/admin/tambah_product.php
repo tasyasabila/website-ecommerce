@@ -8,24 +8,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $price = $_POST['price'] ?? '';
     $description = $_POST['full_description'] ?? '';
     $category = $_POST['category'] ?? '';
+    $image_name = '';
 
-    // Validasi sederhana
     if ($product_name && $price && $category) {
         // Proses upload gambar
         if (isset($_FILES['product_image']) && $_FILES['product_image']['error'] == 0) {
-            $image_name = $_FILES['product_image']['name'];
+            $image_name = uniqid() . '_' . $_FILES['product_image']['name'];
             $tmp = $_FILES['product_image']['tmp_name'];
-            $target = 'uploads/' . basename($image_name);
-
+            $target = 'uploads/' . $image_name;
             move_uploaded_file($tmp, $target);
-            $upload_status = "Gambar berhasil diunggah: $image_name";
-        } else {
-            $upload_status = "Gambar tidak diunggah.";
         }
 
-        echo "<div class='alert alert-success'>Produk '$product_name' berhasil ditambahkan.<br>$upload_status</div>";
+        // Simpan ke database
+        $stmt = $conn->prepare("INSERT INTO products (name, price, description, category_id, image_url) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("sdsss", $product_name, $price, $description, $category, $image_name);
+        if ($stmt->execute()) {
+            echo "<div class='alert alert-success'>Produk berhasil disimpan ke database.</div>";
+        } else {
+            echo "<div class='alert alert-danger'>Gagal menyimpan ke database.</div>";
+        }
+        $stmt->close();
     } else {
-        echo "<div class='alert alert-danger'>Harap lengkapi semua data yang wajib diisi.</div>";
+        echo "<div class='alert alert-danger'>Harap lengkapi semua kolom yang wajib diisi.</div>";
     }
 }
 ?>
@@ -204,14 +208,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                                         <div class="col-12 col-md-6">
                                             <label for="category" class="form-label">Category <span class="text-danger">*</span></label>
-                                            <select class="form-select" name="category" id="category" required>
+                                            <select class="form-select" name="category_id" id="category" required>
                                                 <option value="" selected disabled>Select category</option>
-                                                <option value="Electronics">Electronics</option>
-                                                <option value="Clothing">Clothing</option>
-                                                <option value="Home & Garden">Home & Garden</option>
-                                                <option value="Sports & Outdoors">Sports & Outdoors</option>
-                                                <option value="Toys & Games">Toys & Games</option>
+                                                <?php
+                                               
+
+                                                // Ambil data kategori dari database
+                                                $query = "SELECT id, name FROM categories ORDER BY name ASC";
+                                                $result = $conn->query($query);
+
+                                                while ($row = $result->fetch_assoc()) {
+                                                    echo "<option value='{$row['id']}'>{$row['name']}</option>";
+                                                }
+                                                ?>
                                             </select>
+
                                             <div class="invalid-feedback">Please select a category.</div>
                                         </div>
 
